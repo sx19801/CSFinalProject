@@ -53,4 +53,4 @@ server = ModularServer(
     BerryCollectionModel, [grid], "Berry Collection Model", simulation_params,
 )
 server.port = 8889  # The default
-#server.launch()
+server.launch()
