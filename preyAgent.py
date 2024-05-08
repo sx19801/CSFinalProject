@@ -47,8 +47,57 @@ class DQNModel(nn.Module):
         x = F.relu(self.layer2(x))
         return self.layer3(x)
 
+class DQNConvModel(nn.Module):
+    def __init__(self, input_shape, n_actions):
+        #print(f"input shape: {input_shape}")
+        #print(f"input shape: {input_shape[0]}")
+        
+        super(DQNConvModel, self).__init__()
+        # Define convolutional layers
+        
+        self.conv1 = nn.Conv2d(in_channels=input_shape[0], out_channels=32, kernel_size=3, stride=1, padding=1, device=device)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1, device=device)
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1, device=device)
+
+        # Compute the size of the output from the last Conv layer to properly connect to the Linear layer
+        self.fc_input_dim = self._conv_output(input_shape)
+        #print(f"self.fc_input_dim: {self.fc_input_dim}")
+        #time.sleep(5)
+        # Define linear layers
+        self.fc1 = nn.Linear(self.fc_input_dim, 512, device=device)
+        self.out = nn.Linear(512, n_actions, device=device)
+
+    def _conv_output(self, shape):
+        #print(f"shape: {shape}")
+        o = torch.zeros(1, *shape, device=self.conv1.weight.device)
+        #print(f"o after zeros: {o}")
+        o = self.conv1(o)
+        #print(f"o after first conv: {o}")
+        o = self.conv2(o)
+        #print(f"o after second conv: {o}")
+        o = self.conv3(o)
+        #print(f"o after convo layers: {o}")
+        
+        #print(f"torch.numel(o): {int(torch.numel(o))}")
+        return int(torch.numel(o))
+
+    def forward(self, x):
+        #print("WE IN IT RBO 1")
+        #print(f"the state in the forward just before conv layers: {x}")
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = F.relu(self.conv3(x))
+        x = x.view(x.size(0), -1)  # Flatten the output for the Linear layer
+        x = F.relu(self.fc1(x))
+        x = self.out(x)
+        #print(f"the output or QVALS for each action: {x}")
+        #time.sleep(3)
+        return x
+
 class DQNPreyAgent:
-    def __init__(self, model, action_space):
+    def __init__(self, model, action_space, index, alive):
+        self.index = index
+        self.alive = alive
         self.policy_net = model
         self.target_net = model
         self.optimiser = optim.Adam(self.policy_net.parameters(), lr=LR, amsgrad=True)
@@ -85,9 +134,12 @@ class DQNPreyAgent:
                 # print(f"policy net with state returns: {self.policy_net(state)}")
                 # print(f"policy net with state with max(1) returns: {self.policy_net(state).max(1)}")
                 # print(f"policy net with state with max(1) returns: {self.policy_net(state).max(1).indices}")
-                
+                #print("we in the thing")
+                #print(state.size())
+                #print(state)
                 return self.policy_net(state).max(1).indices.view(1, 1)
         else:
+            #print(state)
             #print(f"the else statement: {[[self.action_space.sample()]]} and its type: {type([[self.action_space.sample()]])}")
             return torch.tensor([[self.action_space.sample()]], device=device, dtype=torch.long)
         
