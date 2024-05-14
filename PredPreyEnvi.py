@@ -7,32 +7,22 @@ from gymnasium import spaces
 
 
 class PredPreyEnv(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 30}
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 10}
     
-    def __init__(self, render_mode="human", grid_height=5, grid_width=5, num_prey=2, num_pred=1, num_berry=1, num_channels=4):
+    def __init__(self, render_mode="human", grid_height=7, grid_width=7, num_prey=1, num_pred=2, num_berry=0, num_channels=4):
         self.grid_size = (grid_width, grid_height)
-        self.window_size = [480,360]
+        self.window_size = [720,480]
         self.num_prey = num_prey
         self.num_pred = num_pred
         self.num_berry = num_berry
         self.num_channels = num_channels
         self.num_channels = 3 + num_prey    #the three channels being all prey,pred,berry and others being self identifiers
-        
         self.current_ep_total_reward = 0
-        
         self.num_agents = self.num_berry+self.num_pred+self.num_prey
-        #super(PredatorPreyEnv, self).__init__()
-        # Define action and observation space
-        # They must be gym.spaces objects
         
         self.action_space = spaces.Discrete(4)  # Example: 4 actions (up, down, left, right)
         
         self.observation_space = spaces.Box(low=0, high=1, shape=(self.num_channels, self.grid_size[0], self.grid_size[1]), dtype=int)
-        # self.action_space = spaces.dict.Dict(
-        #     {
-        #         "prey": spaces.Discrete(4)
-        #     }
-        # )
         
         spawn_points = self.spawning()
         random.shuffle(spawn_points)
@@ -43,27 +33,9 @@ class PredPreyEnv(gym.Env):
         self.pred_locations = np.array([spawn_points.pop() for _ in range(self.num_pred)])
         self.berry_locations = np.array([spawn_points.pop() for _ in range(self.num_berry)])
         
-        print(type(self.prey_locations))
-        
-        #self.xy_low = np.array([0,0])
-        #self.xy_high = np.array([self.grid_size[0]-1,self.grid_size[1]-1])
-        
-        # all_agent_grids = {
-        #     "prey_locations": spaces.Box(low=0, high=1, shape=self.grid_size, dtype=int),
-        #     "pred_locations": spaces.Box(low=0, high=1, shape=self.grid_size, dtype=int),
-        #     "berry_locations": spaces.Box(low=0, high=1, shape=self.grid_size, dtype=int),
-        # }
-        
-        # prey_agent_unique_identifier_grids = {
-        #     f"prey_agent_{i}": spaces.Box(low=0, high=1, shape=self.grid_size, dtype=np.float32)
-        #         for i in range(self.num_prey)
-        # }
-        
-        # self.observation_space = spaces.Dict({**all_agent_grids, **prey_agent_unique_identifier_grids})     #returns a dict where first three entries are locations of all prey, pred, berry 
-                                                                                                            #and fourth entry onwards is dependent on how many prey agents there are
-        
-                                                                                             
-        print(f"prey_locations form: {self.observation_space}")
+        #print(type(self.prey_locations))
+                                                                              
+        #print(f"prey_locations form: {self.observation_space}")
         self._action_to_direction = {
             0: np.array([0,1]),   #up
             1: np.array([1,0]),   #right
@@ -102,118 +74,62 @@ class PredPreyEnv(gym.Env):
             x = min(grid_size[1] - 1, x + 1)
         return (y, x)   
     
-    def _get_obs(self, prey_index):      #adds all the shit to the grid
+    def _get_obs(self, prey_locations):      #adds all the shit to the grid
         grid = np.zeros((self.num_channels, self.grid_size[0], self.grid_size[1]), dtype=int)  # Assuming 1 channel; use more if needed
         
         #print(f"the grid in _get_obs(): {grid}")
-        print(f"the prey locations in _get_obs(): {self.prey_locations}")
+        #print(f"the prey locations in _get_obs(): {prey_locations}")
         # self.prey_locations = self.prey_locations[0]          #making the list of arrays into just an array i.e. from [[x,y]] to [x,y]
         # self.pred_locations = self.pred_locations[0]
         # self.berry_locations = self.berry_locations[0]
         
-        #print(self.prey_location)
+        #print(len(self.prey_locations))
         #print(self.prey_location[1])
         #print(self.prey_location[0])
-        for location in self.prey_locations:
-            grid[0, location[0], location[1]] = 1  # Mark prey
+        for k, active in enumerate(self.active_prey):
+            if active:  # This is equivalent to checking if active == True
+                location = prey_locations[k]
+                grid[0, location[0], location[1]] = 1  # Mark prey
+
         #print(f"grid 0: {grid[0]}")
         for location in self.pred_locations:
             grid[1, location[0], location[1]] = 1  # Mark predator
         for location in self.berry_locations:
             grid[2, location[0], location[1]] = 1  # Mark berry
-        for i in range(prey_index):
-            grid[i+3, self.prey_locations[i][0], self.prey_locations[i][1]] = 1     # Mark self
+        for i in range(self.num_prey):
+            if self.active_prey[i] == True:
+                grid[i+3, prey_locations[i][0], prey_locations[i][1]] = 1     # Mark self
         return grid
     
     def _get_info(self): # gets some kind of info i.e. could be distances from berry and pred etc.
-        return {"prey": self.prey_locations.squeeze(), "pred": self.pred_locations.squeeze(), "berry": self.berry_locations.squeeze()}
+        return {"prey": self.prey_locations.squeeze(), "pred": self.pred_locations.squeeze(), "berry": self.berry_locations.squeeze(), "alive_prey": self.active_prey}
     
     def get_inf(self): # gets some kind of info i.e. could be distances from berry and pred etc.
         return self.current_ep_total_reward
     
-    def resolve_conflicts(self, new_positions, agents_rewards):
-        unique_positions, indices, counts = np.unique(new_positions, axis=0, return_inverse=True, return_counts=True)
-        conflicts = unique_positions[counts > 1]
-        # print(f"conflict: {conflicts}")
-        # print(f"unique_positions: {unique_positions}")
-        # print(f"new pos: {new_positions}")
-        for conflict in conflicts:
-            conflicting_agents = np.where((new_positions == conflict).all(axis=1))[0]
-            #print(f"conflicting agents: {conflicting_agents}")
-            #active_conflicting_agents = [agent for agent in conflicting_agents if self.active_prey[agent]]
-            active_conflicting_agents = [agent for agent in conflicting_agents if self.active_prey[agent]]
-            
-            #print(f"active conflicting agents: {active_conflicting_agents}")
-            # Identify the agent with the highest reward in the current timestep among those in conflict
-            if active_conflicting_agents:
-                highest_reward = max(agents_rewards[agent] for agent in active_conflicting_agents)
-                highest_reward_agents = [agent for agent in active_conflicting_agents if agents_rewards[agent] == highest_reward]
-                chosen_agent = random.choice(highest_reward_agents)
-                # Allow only the agent with the highest recent reward to move to the conflict position
-                # print(f"highest reward agent: {highest_reward}")
-                # print(f"chosen agent: {chosen_agent}")
-                # print(f"highest reward agents: {highest_reward_agents}")
-                # print(f"prey locations: {self.prey_locations}")
-                for agent in active_conflicting_agents:
-                    if agent != chosen_agent:
-                        new_positions[agent] = self.prey_locations[agent]
-                #         print(f"prey locations: {self.prey_locations}")
-                #         print(f"prey locations[agent]: {self.prey_locations[agent]}")
-                #         print(f"new positions: {new_positions[agent]}")
-                # print(f"new positions: {new_positions}")
-        return new_positions
-    
     def step(self, actions):
         #actions is a dict of the form: PreyIndexNumber: Action or False
         #need to check whether action is false or true 
-        #print(f"self.prey_locations {self.prey_locations}")
-
+        #print("-----------")
+        #print(f"self.prey_locations: {self.prey_locations}")
+        #print(f"self.pred_locations: {self.pred_locations}")
         assert len(actions) == self.num_prey, "each agent must have an action"
-        print(actions)
-        scalar_actions = []
+        #print(actions)
+        self.scalar_actions = []
+        episode_done = []
+        
         for key in actions:
-            print(f"actions[key]: {actions[key]}")
+            #print(f"actions[key]: {actions[key]}")
             if actions[key] == -1:        #check for if the agent is dead
-                scalar_actions.append(-1)           #assign -1 to action to represent dead
+                self.scalar_actions.append(-1)           #assign -1 to action to represent dead
+                self.active_prey[key] = False
             else:
-                scalar_actions.append(actions[key].item())
-            
-        print(f"actions scalar: {scalar_actions}")
-        #print(f"action to direction scalar 0th element: {self._action_to_direction[scalar_actions[0]]}")
-        # directions = []
-        # for i in range(len(scalar_actions)):
-        #     print(i)
-        #     print(directions)
-        #     directions.append(self._action_to_direction[scalar_actions[i]])
-            
-       # print(f"directions: {directions}")
-        #np.array([for  in range ])    
-        
-        #directions_ar = np.array(directions)
-        #new_prey_locations = np.array(self.prey_locations, copy=True)
-        
-        
-        # for i in range(self.num_prey):
-        #     if self.active_prey[i] == 1: #if alive then update position
-        #         np.clip(self.prey_locations[i] + directions_ar[i] , 0, self.grid_size[0]-1)
-        print(f"self.prey_locations {self.prey_locations}")
-        # print(f"self.prey_locations {self.prey_locations[0]}")
-        # print(f"self.prey_locations {self.prey_locations[0][0]}")
-        # print(f"self.prey_locations {self.prey_locations[0][1]}")
-        # print(f"self.prey_locations {self.prey_locations[1]}")
-        # print(f"self.prey_locations {self.prey_locations[1][0]}")
-        # print(f"self.prey_locations {self.prey_locations[1][1]}")
-        
-        # new_prey_locations = np.clip(
-        #     self.prey_locations + directions_ar , 0, self.grid_size[0]-1
-        # )
-        #print(f"new_prey_locations: {new_prey_locations}")
-        
-        #NEED TO CREATE A PROPOSED MOVE ARRAY
+                self.scalar_actions.append(actions[key].item())
+       
         new_prey_locations = np.array(self.prey_locations, copy=True)
-        for index, scalar_action in enumerate(scalar_actions):
-            print(f"index is : {index}")
-            print(f"action is : {scalar_actions}")
+        for index, scalar_action in enumerate(self.scalar_actions):
+            #print(f"index is : {index}")
+            #print(f"action is : {self.scalar_actions}")
             if scalar_action != -1:        #dead check
                 if scalar_action == 0 and self.prey_locations[index][1] < self.grid_size[1]-1:  # Move up
                     #print(new_prey_locations[index])
@@ -233,50 +149,51 @@ class PredPreyEnv(gym.Env):
                     #print(new_prey_locations[index])
                 else:
                     new_prey_locations[index] = self.prey_locations[index] #not dead but on border
-            elif actions[index] == -1:      #dead check
-                print("dead index shit working")
-                self.prey_locations[index] = self.prey_locations[index]
+            elif self.scalar_actions[index] == -1:      #dead check
+                #print("dead index shit working")
+                new_prey_locations[index] = self.prey_locations[index]
         
-        #new_positions = self.resolve_conflicts(new_prey_locations, self.cumulative_prey_rewards)
+        #test_prey_locations = np.array([np.array([3,3]),np.array([3,3]), np.array([3,3])])
+        #print(f"test prey locations: {new_prey_locations}")
+
+        self.cumulative_prey_rewards = np.array([5,2,2])
+        new_prey_locations_resolved = self.resolve_conflicts(new_prey_locations, self.cumulative_prey_rewards)
+
+        #MOVE PREDATORS
+        self.move_pred()
+        print(self.pred_locations)
+
+
+        current_turn_rewards = np.zeros(self.num_prey)
+        for i in range(self.num_prey):
+            for j in range(self.num_berry):
+                if np.array_equal(new_prey_locations_resolved[i], self.berry_locations[j]):
+                    current_turn_rewards[i] = 5
+            for j in range(self.num_pred):
+                if np.array_equal(new_prey_locations_resolved[i], self.pred_locations[j]):
+                    current_turn_rewards[i] = -5
+                    self.active_prey[i] = False     #MORTIS
+                    #print("MORTIS")
+
+            if current_turn_rewards[i] == 0:
+                current_turn_rewards[i] = 0.05
         
-        #print(f"self.prey_locations after move {self.prey_locations}")
-        print(f"new_prey_locations: {new_prey_locations}")
-        # Implement the logic to take one step in the environment
-        # and return observation, reward, done, info
-        #time.sleep(5)
-        #direction = self._action_to_direction[action]
-        #print(f"direction: {direction}")
-        #np.clip() to ensure agent stays on grid
+        #print(f"current turn rewards: {current_turn_rewards}")
         
-        #episode finishes if the prey reaches the berry or encounters pred
-        episode_done_positive = np.array_equal(self.prey_locations, self.berry_locations)
-        episode_done_negative = np.array_equal(self.prey_locations, self.pred_locations)
-        
-        rewards = {
-            "positive": 5,     #agent gets berry
-            "negative": -5,    #agent gets caught by pred
-        }
-        
-        if episode_done_positive:
-            condition = "positive"
-        elif episode_done_negative:
-            condition = "negative"
-        else:
-            condition = "neutral"
-            
-        reward = rewards.get(condition, -0.1) # default to -0.1 if condition not found
-        
-        episode_done = episode_done_negative or episode_done_positive
-        observation = self._get_obs(reward)
+        self.prey_locations = new_prey_locations_resolved #setting old positions to new positions
+
+        episode_done = not any(self.active_prey)    #finish ep if no prey agents alive
+
+        observation = self._get_obs(new_prey_locations_resolved)
         info = self._get_info()
         
         if self.render_mode == "human":
             pass
             #self.render_frame()
         
-        self.current_ep_total_reward = reward + self.current_ep_total_reward
+        #self.current_ep_total_reward = reward + self.current_ep_total_reward
         
-        return observation, reward, episode_done, False, info    
+        return observation, current_turn_rewards, self.active_prey, episode_done, info    
 
     def reset(self, seed=None, options=None):
         # Reset the state of the environment to an initial state
@@ -284,22 +201,19 @@ class PredPreyEnv(gym.Env):
         #print("------RESET CALLED------")
         #following line to seed np.random
         super().reset(seed=seed)
-        
+        self.active_prey = np.ones(self.num_prey, dtype=bool)
         spawn_points = self.spawning()
         random.shuffle(spawn_points)
         
         self.prey_locations = np.array([spawn_points.pop() for _ in range(self.num_prey)])
         self.pred_locations = np.array([spawn_points.pop() for _ in range(self.num_pred)])
         self.berry_locations = np.array([spawn_points.pop() for _ in range(self.num_berry)])
-        print(f"the prey locations in reset: {self.prey_locations}")
-        
-        #self.pred_location = np.array([4,1])
-        #self.berry_location = np.array([4,0])
+        #print(f"the prey locations in reset: {self.prey_locations}")
             
         self.current_ep_total_reward = 0
         
-        observation = self._get_obs(self.num_prey)
-        print(f"observation in reset: {observation}")
+        observation = self._get_obs(self.prey_locations)
+        #print(f"observation in reset: {observation}")
         info = self._get_info()
         
         if self.render_mode == "human":
@@ -309,10 +223,10 @@ class PredPreyEnv(gym.Env):
 
     def render(self):
         if self.render_mode == 'rgb_array':
-            return self._render_frame()
+            return self.render_frame()
                    
     def render_frame(self):
-        if self.window is None and self.render_mode == "human":
+        if self.window is None and self.render_mode == "human" :
         # Initialize Pygame and the display window
             pg.init()
             pg.display.init()
@@ -323,26 +237,17 @@ class PredPreyEnv(gym.Env):
             
         if self.clock is None and self.render_mode == "human":
             self.clock = pg.time.Clock()
-            
-        # self.prey_locations_tuple = self.prey_locations.flatten() #converting the ndarray into a tuple to make computation easier
-        # self.pred_locations_tuple = self.pred_locations.flatten()
-        # self.berry_locations_tuple = self.berry_locations.flatten()
         
         #print(f"self.prey_locations_tuple in render frame: {self.prey_locations_tuple}")
         
         self.window.fill((43,43,43))
-        canvas = pg.Surface((300, 300))
+        canvas = pg.Surface((500, 500))
         canvas.fill((54, 54, 54))
         pix_square_size = (
             canvas.get_size()[0] / self.grid_size[0]
         )  # The size of a single grid square in pixels
 
         pix_square_size = int(pix_square_size)
-        
-        # print(f"pix square size: {int(pix_square_size)}")
-        # print(f"mult: { pix_square_size * self.prey_location}")
-        # print(f"type of prey location: {type(self.prey_location)}")
-        # print(f"prey location as tuple: {tuple(self.prey_location)}")
         
         
         # Next we draw pred
@@ -367,14 +272,17 @@ class PredPreyEnv(gym.Env):
 
         # draw prey
         for prey in range(self.num_prey):
-            print(f"pred location * pix square size {pix_square_size*self.prey_locations[prey]}")
-            pg.draw.rect(
-                canvas,
-                (0, 0, 255),
-                pg.Rect(
-                    tuple(pix_square_size * self.prey_locations[prey]), (pix_square_size,pix_square_size)
-                ),
-            )
+            if self.active_prey[prey] == True:
+            #print(f"pred location * pix square size {pix_square_size*self.prey_locations[prey]}")
+                pg.draw.rect(
+                    canvas,
+                    (0, 0, 255),
+                    pg.Rect(
+                        tuple(pix_square_size * self.prey_locations[prey]), (pix_square_size,pix_square_size)
+                    ),
+                )
+            else:
+                pass
         # Finally, add some gridlines
         for x in range(self.grid_size[0] + 1):
             pg.draw.line(
@@ -409,3 +317,108 @@ class PredPreyEnv(gym.Env):
         if self.window is not None:
             pg.display.quit()
             pg.quit()
+
+    def key_presses(self, running):
+        keys = pg.key.get_pressed()
+        #print(keys)
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                running = False
+                
+            
+            if event.type == pg.KEYDOWN:
+                if event.key == pg.K_ESCAPE:
+                    running = False
+                    
+
+        if keys[pg.K_ESCAPE]:
+            #print(f"yo")
+            running = False
+
+        if keys[pg.K_UP]:
+            if self.render_mode == None:
+                print("we ON!")
+                self.render_mode = "human"
+                time.sleep(2)
+            elif self.render_mode == "human":
+                print("!we OFF")
+                self.render_mode = None
+                time.sleep(2)
+
+        return running
+    
+    def resolve_conflicts(self, new_positions, agents_rewards):
+        unique_positions, indices, counts = np.unique(new_positions, axis=0, return_inverse=True, return_counts=True)
+        conflicts = unique_positions[counts > 1]
+        #print(f"conflict: {conflicts}")
+        #print(f"unique_positions: {unique_positions}")
+        #print(f"new pos: {new_positions}")
+        for conflict in conflicts:
+            conflicting_agents = np.where((new_positions == conflict).all(axis=1))[0]
+            #print(f"conflicting agents: {conflicting_agents}")
+            #print(f"active preys: {self.active_prey}")
+            #active_conflicting_agents = [agent for agent in conflicting_agents if self.active_prey[agent]]
+            active_conflicting_agents = [agent for agent in conflicting_agents if self.active_prey[agent]]
+            
+            #print(f"active conflicting agents: {active_conflicting_agents}")
+            # Identify the agent with the highest reward in the current timestep among those in conflict
+            if active_conflicting_agents:
+                highest_reward = max(agents_rewards[agent] for agent in active_conflicting_agents)
+                highest_reward_agents = [agent for agent in active_conflicting_agents if agents_rewards[agent] == highest_reward]
+                chosen_agent = random.choice(highest_reward_agents)
+                # Allow only the agent with the highest recent reward to move to the conflict position
+                # print(f"highest reward agent: {highest_reward}")
+                # print(f"chosen agent: {chosen_agent}")
+                # print(f"highest reward agents: {highest_reward_agents}")
+                # print(f"prey locations: {self.prey_locations}")
+                for agent in active_conflicting_agents:
+                    if agent != chosen_agent:
+                        new_positions[agent] = self.prey_locations[agent]
+                #         print(f"prey locations: {self.prey_locations}")
+                #         print(f"prey locations[agent]: {self.prey_locations[agent]}")
+                #         print(f"new positions: {new_positions[agent]}")
+                # print(f"new positions: {new_positions}")
+        return new_positions
+    
+    def move_pred(self):
+        # Calculate intended moves first
+        intended_positions = [list(pos) for pos in self.pred_locations]  # Make a copy of current positions
+
+        # Move each predator towards the closest prey
+        for i in range(self.num_pred):
+            closest_prey = None
+            min_dist = float('inf')
+
+            # Find the closest prey to predator i
+            for j in range(self.num_prey):
+                x_diff = abs(self.pred_locations[i][0] - self.prey_locations[j][0])
+                y_diff = abs(self.pred_locations[i][1] - self.prey_locations[j][1])
+                distance = x_diff + y_diff  # Manhattan distance
+                if distance < min_dist:
+                    min_dist = distance
+                    closest_prey = j
+
+            # Determine the movement based on closest prey
+            if closest_prey is not None:
+                x_diff = self.pred_locations[i][0] - self.prey_locations[closest_prey][0]
+                y_diff = self.pred_locations[i][1] - self.prey_locations[closest_prey][1]
+
+                # Move in the direction that minimizes the largest difference
+                if abs(x_diff) > abs(y_diff):
+                    intended_positions[i][0] += -1 if x_diff > 0 else 1
+                else:
+                    intended_positions[i][1] += -1 if y_diff > 0 else 1
+
+        # Resolve conflicts and update actual positions
+        occupied_positions = set()
+        for idx, pos in enumerate(intended_positions):
+            if tuple(pos) not in occupied_positions:
+                self.pred_locations[idx] = pos
+                occupied_positions.add(tuple(pos))
+            else:
+                # If position is already taken, do not move predator
+                print(f"Conflict resolved for predator {idx}, stays at {self.pred_locations[idx]}")
+
+
+
+
