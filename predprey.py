@@ -30,13 +30,13 @@ if is_ipython:
 
 plt.ion()
 
-GRIDSIZE = 3
+GRIDSIZE = 9
 WIDTH,HEIGHT = 720, 560
 ROWS, COLUMNS = GRIDSIZE,GRIDSIZE
 FPS = 10
 TAU = 0.008
 #variables here
-num_prey = 3
+num_prey = 5
 channels = 4    #represents the features i.e. should always be 4 unless change to features
 
 def plot_durations(show_result=False):
@@ -87,6 +87,7 @@ berry_pos = np.array([])
 
 #Testing//Main loop
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"device: {device}")
 #env = PredatorPreyEnv()
 initial_state, info = env.reset()
 input_shape = (channels,ROWS,COLUMNS)

@@ -5,12 +5,12 @@ import time
 import gymnasium as gym
 from gymnasium import spaces
 
-GRIDSIZE = 3
+GRIDSIZE = 9
 
 class PredPreyEnv(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 30}
     
-    def __init__(self, render_mode="human", grid_height=GRIDSIZE, grid_width=GRIDSIZE, num_prey=3, num_pred=0, num_berry=0 , num_channels=4):
+    def __init__(self, render_mode="human", grid_height=GRIDSIZE, grid_width=GRIDSIZE, num_prey=5, num_pred=1, num_berry=3 , num_channels=4):
         self.grid_size = (grid_width, grid_height)
         self.window_size = [730,560]
         self.num_prey = num_prey
@@ -79,34 +79,34 @@ class PredPreyEnv(gym.Env):
         return spawn_pool
 
     def spawn_berry(self, prey_locations, berry_number):
-        print(f"prey locations: {prey_locations}  pred locations: {self.pred_locations}  berry locations: {self.berry_locations}")
-        print(f"size of pbrry locations: {self.berry_locations.shape} and prey shape: {prey_locations.shape} sie of pred: {self.pred_locations.shape}")
+        #print(f"prey locations: {prey_locations}  pred locations: {self.pred_locations}  berry locations: {self.berry_locations}")
+        #print(f"size of pbrry locations: {self.berry_locations.shape} and prey shape: {prey_locations.shape} sie of pred: {self.pred_locations.shape}")
         if self.num_pred == 0:
             occupied_locations = np.concatenate((prey_locations, self.berry_locations))
         else:
             occupied_locations = np.concatenate((prey_locations, self.pred_locations, self.berry_locations), axis=0)
 
-        print(f"pred sie: {self.pred_locations.shape}")
+        #print(f"pred sie: {self.pred_locations.shape}")
         occupied_locations = set(map(tuple, occupied_locations))
-        print(f"array occupied: {occupied_locations}")
+        #print(f"array occupied: {occupied_locations}")
         spawn_pool = np.array([[x, y] for x in range(self.grid_size[0]) for y in range(self.grid_size[1])])
             
         mask = np.array([tuple(loc) not in occupied_locations for loc in spawn_pool])
-        print(f"spawnpool: {spawn_pool}")
+        #print(f"spawnpool: {spawn_pool}")
         
         available_locations = spawn_pool[mask]
-        print(f"available locations: {available_locations}")
+        #print(f"available locations: {available_locations}")
         if available_locations.size > 0:
             random_location = available_locations[np.random.choice(available_locations.shape[0])]
-        print(f"available spawns: {random_location}")
+        #print(f"available spawns: {random_location}")
         random_location = random_location.reshape(1,2)
-        print(f"available spawns: {random_location}")
-        print(f"berry locations before adding: {self.berry_locations}")
-        print(f"berry number: {berry_number}")
+        #print(f"available spawns: {random_location}")
+        #print(f"berry locations before adding: {self.berry_locations}")
+        #print(f"berry number: {berry_number}")
         self.berry_locations = np.delete(self.berry_locations, berry_number, axis=0)
         self.berry_locations = np.vstack([self.berry_locations, random_location])
-        print(f"berry locations after adding: {self.berry_locations}")
-        time.sleep(2)
+        #print(f"berry locations after adding: {self.berry_locations}")
+        #time.sleep(2)
 
 
     def spawning(self):
@@ -256,9 +256,9 @@ class PredPreyEnv(gym.Env):
                         self.current_turn_rewards[i] = 5
                         self.prey_energy[i] = self.prey_energy[i]+self.berry_energy_amount
                         #remove berry and spawn another one
-                        print(f"self.berrylocations: {self.berry_locations}")
+                        #print(f"self.berrylocations: {self.berry_locations}")
                         self.spawn_berry(new_prey_locations_resolved, j)
-                        print(f"new berrylocations: {self.berry_locations}")
+                        #print(f"new berrylocations: {self.berry_locations}")
 
                 #DEATH
                 for j in range(self.num_pred):
@@ -308,7 +308,7 @@ class PredPreyEnv(gym.Env):
         
         self.turns_until_move_counter+=1
         #self.current_ep_total_reward = reward + self.current_ep_total_reward
-        print(f"self.current turn rewards: {self.current_turn_rewards}")
+        #print(f"self.current turn rewards: {self.current_turn_rewards}")
         return observation, self.current_turn_rewards, self.active_prey, episode_done, info    
 
     def reset(self, seed=None, options=None):
@@ -340,7 +340,7 @@ class PredPreyEnv(gym.Env):
         
         if self.render_mode == "human":
             self.render_frame()
-        time.sleep(1)
+        #time.sleep(1)
         return observation, info 
 
     def render(self):
@@ -472,15 +472,15 @@ class PredPreyEnv(gym.Env):
         return running
     
     def resolve_conflicts(self, new_positions, agents_rewards):
-        print(f"new pos: {new_positions}")
-        time.sleep(1)
+        #print(f"new pos: {new_positions}")
+        #time.sleep(1)
         unique_positions, indices, counts = np.unique(new_positions, axis=0, return_inverse=True, return_counts=True)
         conflicts = unique_positions[counts > 1]
-        print(f"conflict: {conflicts}")
+       # print(f"conflict: {conflicts}")
         #print(f"unique_positions: {unique_positions}")
         for conflict in conflicts:
             conflicting_agents = np.where((new_positions == conflict).all(axis=1))[0]
-            print(f"conflicting agents: {conflicting_agents}")
+            #print(f"conflicting agents: {conflicting_agents}")
             #print(f"active preys: {self.active_prey}")
             #active_conflicting_agents = [agent for agent in conflicting_agents if self.active_prey[agent]]
             active_conflicting_agents = [agent for agent in conflicting_agents if self.active_prey[agent]]
@@ -503,7 +503,7 @@ class PredPreyEnv(gym.Env):
                 #         print(f"prey locations[agent]: {self.prey_locations[agent]}")
                 #         print(f"new positions: {new_positions[agent]}")
                 # print(f"new positions: {new_positions}")
-        print(f"resolved pos: {new_positions}")
+        #print(f"resolved pos: {new_positions}")
         return new_positions
     
     def move_pred(self):
@@ -544,6 +544,7 @@ class PredPreyEnv(gym.Env):
                 occupied_positions.add(tuple(pos))
             else:
                 # If position is already taken, do not move predator
+                pass
                 print(f"Conflict resolved for predator {idx}, stays at {self.pred_locations[idx]}")
 
         self.moved_last_turn = True
