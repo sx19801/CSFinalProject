@@ -61,8 +61,8 @@ class DQNConvModel(nn.Module):
         self.conv3 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1, device=device)
 
 
-        print(f"weights of conv1: {self.conv1.weight.data}")
-        time.sleep(10)
+        #print(f"weights of conv1: {self.conv1.weight.data}")
+        #time.sleep(10)
         dummy_input = torch.zeros(1, *input_shape, device=self.conv1.weight.device)
         # Compute the size of the output from the last Conv layer to properly connect to the Linear layer
         #print(f"input_shape: {input_shape}")

@@ -40,6 +40,10 @@ class PredPreyEnv(gym.Env):
         self.prey_locations = np.array([spawn_pool_other.pop() for _ in range(self.num_prey)])
         self.berry_locations = np.array([spawn_pool_other.pop() for _ in range(self.num_berry)])
         
+        self.spawn_berry(self.prey_locations)
+        self.spawn_berry(self.prey_locations)
+        self.spawn_berry(self.prey_locations)
+        time.sleep(5)
         print(f"berry locations: {self.berry_locations} and shape {self.berry_locations.shape}")
        
         self.active_prey_locations = self.prey_locations
@@ -79,9 +83,31 @@ class PredPreyEnv(gym.Env):
         return spawn_pool
 
     def spawn_berry(self, prey_locations):
-        occupied_locations = prey_locations+self.pred_locations+self.berry_locations
-        print(occupied_locations)
-        spawn_pool = [np.array([x, y]) for x in range(self.grid_size[0]) for y in range(self.grid_size[1])]
+        print(f"prey locations: {prey_locations}  pred locations: {self.pred_locations}  berry locations: {self.berry_locations}")
+        print(f"sie of perry locations: {self.berry_locations.shape} and prey shape: {prey_locations.shape} sie of pred: {self.pred_locations.shape}")
+        if self.num_pred == 0:
+            occupied_locations = np.concatenate((prey_locations, self.berry_locations))
+        else:
+            occupied_locations = np.concatenate((prey_locations, self.pred_locations, self.berry_locations), axis=0)
+
+        print(f"pred sie: {self.pred_locations.shape}")
+        occupied_locations = set(map(tuple, occupied_locations))
+        print(f"array occupied: {occupied_locations}")
+        spawn_pool = np.array([[x, y] for x in range(self.grid_size[0]) for y in range(self.grid_size[1])])
+            
+        mask = np.array([tuple(loc) not in occupied_locations for loc in spawn_pool])
+        print(f"spawnpool: {spawn_pool}")
+        
+        available_locations = spawn_pool[mask]
+        print(f"available locations: {available_locations}")
+        time.sleep(5)
+        if available_locations.size > 0:
+            random_location = available_locations[np.random.choice(available_locations.shape[0])]
+        print(f"available spawns: {random_location}")
+        random_location = random_location.reshape(1,2)
+        print(f"available spawns: {random_location}")
+
+        self.berry_locations = np.concatenate(self.berry_locations, random_location)
         
 
 
