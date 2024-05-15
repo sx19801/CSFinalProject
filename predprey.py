@@ -36,7 +36,7 @@ ROWS, COLUMNS = GRIDSIZE,GRIDSIZE
 FPS = 10
 TAU = 0.008
 #variables here
-num_prey = 2
+num_prey = 3
 channels = 4    #represents the features i.e. should always be 4 unless change to features
 
 def plot_durations(show_result=False):
@@ -128,7 +128,7 @@ while running:
         if i_episode!=0:
             initial_state, info = env.reset()
         #print(f"state rn: {initial_state}")
-        
+        print(f"info['prey']: {info['prey']}")
         for i in range(num_prey):
             prey_agents[i].alive = True     #make all agents alive again
 
@@ -138,6 +138,8 @@ while running:
             if env.render_mode == "human" or "off":
                 running = env.key_presses(running)
             if not running: break
+
+            
 
             actions = {}
             self_identifier_initial_states_list = [0]*num_prey  # Assuming 4 channels; use more if needed
@@ -173,10 +175,10 @@ while running:
                 
             
             
-            observation, rewards, active_prey, terminated, _ = env.step(actions) # .item() returns a scalar from a tensor with one value
+            observation, rewards, active_prey, terminated, info = env.step(actions) # .item() returns a scalar from a tensor with one value
             #print(f"info: {info}")
             #print(f"observation after step : {observation}")
-            
+            print(f"info['prey']: {info['prey']}")
             #print(f"prey agent alive before step in ep {i_episode}: {active_prey}")
            #       NEED TO MAKE OBSERVATION INTO THE CORRECT FORM
 
@@ -256,7 +258,7 @@ while running:
                 #     env.render_frame()
                 plot_durations()
                 break                                   #exits the episode
-            #print(f"current turn in episode: {t}")            
+            print(f"current turn in episode: {t}")            
     print('Complete')
     plot_durations(show_result=True)
     plt.ioff()
