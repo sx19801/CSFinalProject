@@ -16,11 +16,11 @@ from gymnasium.envs.registration import register
 #GLOBAL VARIABLES
 BUFFER_SIZE = 1000
 STEPS_DONE = 0
-BATCH_SIZE = 32
+BATCH_SIZE = 16
 GAMMA = 0.99
 EPS_START = 0.9
 EPS_END = 0.05
-EPS_DECAY = 1000
+EPS_DECAY = 25000
 TAU = 0.005
 LR = 1e-4
 
@@ -60,6 +60,9 @@ class DQNConvModel(nn.Module):
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1, device=device)
         self.conv3 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1, device=device)
 
+
+        print(f"weights of conv1: {self.conv1.weight.data}")
+        time.sleep(10)
         dummy_input = torch.zeros(1, *input_shape, device=self.conv1.weight.device)
         # Compute the size of the output from the last Conv layer to properly connect to the Linear layer
         #print(f"input_shape: {input_shape}")
@@ -70,6 +73,8 @@ class DQNConvModel(nn.Module):
         # Define linear layers
         self.fc1 = nn.Linear(self.fc_input_dim, 512, device=device)
         self.out = nn.Linear(512, n_actions, device=device)
+
+        self._initialize_weights()
 
     def _forward_convs(self, x):
         #print(f"shape: {shape}"), x
@@ -93,6 +98,16 @@ class DQNConvModel(nn.Module):
         #print(f"the output or QVALS for each action: {x}")
         #time.sleep(3)
         return x
+    
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                nn.init.constant_(m.bias, 0)
 
 class DQNPreyAgent:
     def __init__(self, model, action_space, index, alive):
@@ -125,6 +140,7 @@ class DQNPreyAgent:
         eps_threshold = EPS_END + (EPS_START - EPS_END) * \
             math.exp(-1. * STEPS_DONE / EPS_DECAY)
         STEPS_DONE += 1
+        #print(f"eps threshold: {eps_threshold}")
         if sample > eps_threshold:
         #if sample < eps_threshold:
 
@@ -230,6 +246,8 @@ class MemoryReplay(object):
         
     def insert(self, *args): # * means it accepts variable length arguments
         self.memory_replay_buffer.append(Transition(*args))
+        #print(Transition(*args))
+        #time.sleep(0.2)
     
     def sample(self,num_samples):
         #check if number of samples is less than size of buffer

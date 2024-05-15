@@ -30,12 +30,14 @@ if is_ipython:
 
 plt.ion()
 
-
-WIDTH,HEIGHT = 720, 480
-ROWS, COLUMNS = 7,7
+GRIDSIZE = 3
+WIDTH,HEIGHT = 720, 560
+ROWS, COLUMNS = GRIDSIZE,GRIDSIZE
 FPS = 10
-TAU = 0.005
+TAU = 0.008
 #variables here
+num_prey = 2
+channels = 4    #represents the features i.e. should always be 4 unless change to features
 
 def plot_durations(show_result=False):
     plt.figure(1)
@@ -51,7 +53,7 @@ def plot_durations(show_result=False):
         plt.clf()
         plt.title('Training...')
     plt.xlabel('Episode')
-    plt.ylabel('Reward')
+    plt.ylabel('Number of Turns')
     #plt.plot(rewards_t.numpy())
     plt.plot(turns_t.numpy())
     # Take 100 episode averages and plot them too
@@ -62,9 +64,9 @@ def plot_durations(show_result=False):
     #     means = torch.cat((torch.zeros(99), means))
     #     plt.plot(means.numpy())
 
-    if len(turns_t) >= 50:
-        means = turns_t.unfold(0, 50, 1).mean(1).view(-1)
-        means = torch.cat((torch.zeros(49), means))
+    if len(turns_t) >= 100:
+        means = turns_t.unfold(0, 100, 1).mean(1).view(-1)
+        means = torch.cat((torch.zeros(99), means))
         plt.plot(means.numpy())
 
 
@@ -80,8 +82,6 @@ def plot_durations(show_result=False):
 prey_pos = np.array([])
 pred_pos = np.array([])
 berry_pos = np.array([])
-num_prey = 1
-channels = 4    #represents the features i.e. should always be 4 unless change to features
 
 
 
@@ -102,10 +102,10 @@ def get_correct_state(state,i):
 
 #prey_agent = DQNPreyAgent(DQNModel(n_observations,env.action_space.n).to(device=device), env.action_space)
 
-#for prey_index in range(num_prey):
-#    prey_agents.append(DQNPreyAgent(DQNConvModel(input_shape, env.action_space.n).to(device), env.action_space, prey_index, alive))
+for prey_index in range(num_prey):
+    prey_agents.append(DQNPreyAgent(DQNConvModel(input_shape, env.action_space.n).to(device), env.action_space, prey_index, alive))
     
-prey_agents.append(DQNPreyAgent(DQNConvModel(input_shape, env.action_space.n).to(device), env.action_space, 0, alive=True))
+#prey_agents.append(DQNPreyAgent(DQNConvModel(input_shape, env.action_space.n).to(device), env.action_space, 0, alive=True))
 #prey_agents.append(DQNPreyAgent(DQNConvModel(input_shape, env.action_space.n).to(device), env.action_space, 1, alive=True))
 #prey_agents.append(DQNPreyAgent(DQNConvModel(input_shape, env.action_space.n).to(device), env.action_space, 2, alive=True))
 
@@ -116,7 +116,7 @@ running = True
 while running:
           
     if torch.cuda.is_available():
-        num_episodes = 600
+        num_episodes = 1800
     else:
         num_episodes = 50
 
@@ -140,12 +140,13 @@ while running:
             if not running: break
 
             actions = {}
-            self_identifier_initial_states_list = [0]*4  # Assuming 4 channels; use more if needed
+            self_identifier_initial_states_list = [0]*num_prey  # Assuming 4 channels; use more if needed
 
             for i in range(num_prey):
                 if prey_agents[i].alive == True:         #ONLY SELECT ACTION IF PREY AGENT ALIVE
                     index = i+3
                     #print(f"index in select action: {index}")
+                    #print(i)
                     #print(f"initial_state: {initial_state}")
                     #print(f"shape of sstate: {initial_state.shape}")
                     
@@ -213,6 +214,8 @@ while running:
                     next_state_i_tensor = None
                         #print(f"next state {i}: {next_state_i_tensor}")
                 #print(f"-------------------\n replay buffer inserts of agent {i}; initial state: {self_identifier_initial_states_list[i]}\n actions: {actions[i]}\n next state: {next_state_i_tensor}\n rewards: {torch.tensor(rewards[i], device=device)}\n ----------------")
+                if actions[i] == -1:
+                    print("this shit is fucked")
                 prey_agents[i].replay_buffer.insert(self_identifier_initial_states_list[i], actions[i], next_state_i_tensor, torch.tensor([rewards[i]], device=device))
 
             #####################
