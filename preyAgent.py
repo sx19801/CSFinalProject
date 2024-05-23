@@ -76,11 +76,18 @@ class DQNConvModel(nn.Module):
 
         self._initialize_weights()
 
+        #print("Initial weights of conv1:", self.conv1.weight)
+        #print("Initial weights of conv2:", self.conv2.weight)
+        #print("Initial weights of conv3:", self.conv3.weight)
+        #print("Initial weights of fc1:", self.fc1.weight)
+        #print("Initial weights of out:", self.out.weight)
+        #time.sleep(5)
+
     def _forward_convs(self, x):
         #print(f"shape: {shape}"), x
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = F.relu(self.conv3(x))
+        x = F.leaky_relu(self.conv1(x), negative_slope=0.01)
+        x = F.leaky_relu(self.conv2(x), negative_slope=0.01)
+        x = F.leaky_relu(self.conv3(x), negative_slope=0.01)
         #print(f"torch.numel(o): {int(torch.numel(o))}")
         return x
     
@@ -93,7 +100,7 @@ class DQNConvModel(nn.Module):
         #print(f"Output of conv layers shape before flattening: {x.shape}")
         x = x.view(x.size(0), -1)  # Flatten the output for the Linear layer
         #print(f"Shape after flattening: {x.shape}")
-        x = F.relu(self.fc1(x))
+        x = F.leaky_relu(self.fc1(x), negative_slope=0.01)
         x = self.out(x)
         #print(f"the output or QVALS for each action: {x}")
         #time.sleep(3)
@@ -208,18 +215,23 @@ class DQNPreyAgent:
         next_state_values = torch.zeros(BATCH_SIZE, device=device)
         with torch.no_grad():
             next_state_values[non_final_mask] = self.target_net(non_final_next_states).max(1).values
+        
+        #next state values are 0 for next_state = None 
         expected_state_action_values = (next_state_values * GAMMA) + reward_batch
         #print("-----------------------TRAIN-----------------------")
         #print(f"next_state_values: {next_state_values}")
         #print("---------------------END TRAIN---------------------")
         # Compute Huber loss
+        #Huber loss: less sensitive to outliers than standard MSE, behaves like MSE for small errors but MAE for large, improving stability
         criterion = nn.SmoothL1Loss()
+        #state_action_values is predicted, expected is target 
         loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
 
         # Optimize the model
         self.optimiser.zero_grad()
+        #gradients calculated through backprop
         loss.backward()
-        # In-place gradient clipping
+        #gradient clipping to mitigate exploding gradients, gradients > 100 clipped to 100, gradients <-100 clipped to -100
         torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
         self.optimiser.step()
         
