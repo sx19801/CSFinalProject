@@ -7,7 +7,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 from PredPreyEnvi import PredPreyEnv
-from preyAgent import DQNPreyAgent, DQNModel, DQNConvModel
+from preyAgent import DQNPreyAgent, DQNConvModel
 import torch
 
 
@@ -30,7 +30,7 @@ if is_ipython:
 
 plt.ion()
 
-GRIDSIZE = 8
+GRIDSIZE = 4
 WIDTH,HEIGHT = 720, 560
 ROWS, COLUMNS = GRIDSIZE,GRIDSIZE
 FPS = 10
@@ -38,6 +38,20 @@ TAU = 0.008
 #variables here
 num_prey = 2
 channels = 4    #represents the features i.e. should always be 4 unless change to features
+
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+SEED = 30
+env.seed(SEED)
+set_seed(SEED)
+
 
 def plot_durations(show_result=False):
     plt.figure(1)
@@ -162,7 +176,7 @@ while running:
 
                     #print(f"self_identifier_state: {self_identifier_initial_state}")
                     
-                    #time.sleep(4)
+                    
 
                     self_identifier_initial_state_tensor = torch.from_numpy(self_identifier_initial_state).float().to(device)
 
@@ -182,6 +196,8 @@ while running:
             
             
             observation, rewards, active_prey, terminated, info = env.step(actions) # .item() returns a scalar from a tensor with one value
+            
+            #print(f"actions: {actions}")
             #print(f"info: {info}")
             #print(f"observation after step : {observation}")
             #print(f"info['prey']: {info['prey']}")
@@ -190,9 +206,9 @@ while running:
 
             
             #print(f"rewards: {rewards}")
-            rewards = torch.tensor(rewards, device=device) # creates a tensor, [reward] converts it into a list with one element ensuring new tensor has one element
-            #print(f"rewards: {rewards}")
             #print(f"rewards: {torch.tensor(rewards[i], device=device)}")
+            #rewards = torch.tensor(rewards, device=device) # creates a tensor, [reward] converts it into a list with one element ensuring new tensor has one element
+            #print(f"rewards: {rewards}")
             
             #self_identifier_states = torch.tensor(self_identifier_state, device=device)
             #print(f"rewards: {rewards}")
@@ -221,7 +237,7 @@ while running:
                 if prey_agents[i].alive == False:   #overwrite next state to none if dead
                     next_state_i_tensor = None
                         #print(f"next state {i}: {next_state_i_tensor}")
-                #print(f"-------------------\n replay buffer inserts of agent {i}; initial state: {self_identifier_initial_states_list[i]}\n actions: {actions[i]}\n next state: {next_state_i_tensor}\n rewards: {torch.tensor(rewards[i], device=device)}\n ----------------")
+                print(f"-------------------\n replay buffer inserts of agent {i}; initial state: {self_identifier_initial_states_list[i]}\n actions: {actions[i]}\n next state: {next_state_i_tensor}\n rewards: {torch.tensor(rewards[i], device=device)}\n ----------------")
                 if actions[i] == -1:
                     print("bug!")
                 prey_agents[i].replay_buffer.insert(self_identifier_initial_states_list[i], actions[i], next_state_i_tensor, torch.tensor([rewards[i]], device=device))

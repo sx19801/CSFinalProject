@@ -27,25 +27,18 @@ LR = 1e-4
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward')) #named tuple for the ease of using the torch methods
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
-class DQNModel(nn.Module):
-    def __init__(self, n_observations, n_actions):
-        super(DQNModel, self).__init__() # This line ensures the nn.Module class' init func is called 
-        self.n_observations = n_observations
-        self.n_actions = n_actions
-        #print(f"n_observations is: {n_observations} adn type is: {type(n_observations)}")
-        #print(f"n_actions is: {n_actions} and type is: {type(n_actions)}")
-        self.layer1 = nn.Linear(n_observations, 128, device=device)
-        self.layer2 = nn.Linear(128,128,device=device)
-        self.layer3 = nn.Linear(128, n_actions,device=device)
-        
-    # def forward1(self,x):
-    #     print(f"in forward of model: {device}")
-    #     return self.network(x)
-    def forward(self,x):
-        x = F.relu(self.layer1(x))
-        x = F.relu(self.layer2(x))
-        return self.layer3(x)
+SEED = 31
+set_seed(SEED)
+
 
 class DQNConvModel(nn.Module):
     def __init__(self, input_shape, n_actions):
@@ -225,6 +218,7 @@ class DQNPreyAgent:
         #Huber loss: less sensitive to outliers than standard MSE, behaves like MSE for small errors but MAE for large, improving stability
         criterion = nn.SmoothL1Loss()
         #state_action_values is predicted, expected is target 
+        #print(f"state action values: {state_action_values} and expected {expected_state_action_values}")
         loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
 
         # Optimize the model
